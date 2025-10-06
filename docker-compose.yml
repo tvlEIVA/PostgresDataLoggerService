@@ -1,0 +1,29 @@
+services:
+  postgresdataloggerservice:
+    image: ${DOCKER_REGISTRY-}postgresdataloggerservice
+    build:
+      context: .
+      dockerfile: PostgresDataLoggerService/Dockerfile
+    ports:
+      - "5000:8080"
+    depends_on:
+      - db
+    environment:
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=mydb;Username=postgres;Password=postgres
+
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mydb
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+
+volumes:
+    pgdata:
+

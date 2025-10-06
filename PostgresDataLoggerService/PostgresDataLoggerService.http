@@ -1,6 +1,6 @@
 @PostgresDataLoggerService_HostAddress = http://localhost:5089
 
-GET {{PostgresDataLoggerService_HostAddress}}/weatherforecast/
+GET {{PostgresDataLoggerService_HostAddress}}/controller/
 Accept: application/json
 
 ###
