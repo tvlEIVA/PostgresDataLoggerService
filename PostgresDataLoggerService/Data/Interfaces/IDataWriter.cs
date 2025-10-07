@@ -52,6 +52,9 @@ namespace PostgresDataLoggerService.Data.Interfaces
         Task DBSaveFilterRangeBearingFromVectorAsync(int seq, short type, List<CFilterRangeBearing> m_vInclFilter, List<CFilterRangeBearing> m_vExclFilter);
         Task DBSaveFilterRangeBearingEmptyAsync(int seq, short nType);
 
+        Task<int> DBSaveBlockMinimalAsync(string name, int folderId = -1);
+        Task<int> DBSaveFolderAsync(string name, int? parentId = null);
+
         Task InitBulkObjectsAsync();
         Task FlushBulkObjectsAsync();
         Task FlushPositionAsync();

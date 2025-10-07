@@ -1,4 +1,6 @@
-﻿using PostgresDataLoggerService.Data.Interfaces;
+﻿using Dapper;
+using Npgsql;
+using PostgresDataLoggerService.Data.Interfaces;
 using PostgresDataLoggerService.Data.Models;
 using PostgresDataLoggerService.Data.Models.Eiva;
 
@@ -6,6 +8,13 @@ namespace PostgresDataLoggerService.Data
 {
     public class PostgresDataAccess : IDataWriter, IDataReader
     {
+        private readonly string _connectionString;
+
+        public PostgresDataAccess(IConfiguration config)
+        {
+            _connectionString = config.GetConnectionString("DefaultConnection");
+        }
+
         public Task<bool> ClearSensorsAsync(long nBlockID, bool m_bBathy, bool m_bSingledata, bool m_bDopplerLog, bool m_bGPSHeight, bool m_bGyro, bool m_bMotion, bool m_bPipetracker, bool m_bScan, bool m_bLaser, bool m_bXY, bool m_bAuxiliary)
         {
             throw new NotImplementedException();
@@ -29,6 +38,26 @@ namespace PostgresDataLoggerService.Data
         public Task<bool> DBSaveBathyAsync(long time, float depth, float altitude = -1, float pressure = -1, long nBlockId = -1, short seq = 0, double m_dScaleDepth = 1)
         {
             throw new NotImplementedException();
+        }
+
+        public async Task<int> DBSaveBlockMinimalAsync(string name, int folderId = -1)
+        {
+            await using var connection = new NpgsqlConnection(_connectionString);
+            await connection.OpenAsync();
+
+            const string sql = @"
+                INSERT INTO ""Block"" (""FolderID"", ""Name"", ""StartTime"", ""StartTimeMs"")
+                VALUES (@FolderID, @Name, @StartTime, 0)
+                RETURNING ""ID"";";
+
+            // Use UTC now if you want a start time; otherwise pass null.
+            var id = await connection.ExecuteScalarAsync<int>(sql, new
+            {
+                FolderID = folderId,
+                Name = name,
+                StartTime = DateTime.UtcNow
+            });
+            return id;
         }
 
         public Task<bool> DBSaveCTDAsync(int type, DateTime time, double east, double north, long nLayers, double[] depth, double[] velo, double[] pres, double[] temp, double[] cond, double[] sali, double[] dens, ref bool blockExist, ref long existingId, long m_nID, List<long> m_CtdBlockIds, List<long> m_SvpBlockIds)
@@ -74,6 +103,34 @@ namespace PostgresDataLoggerService.Data
         public Task DBSaveFilterRangeBearingFromVectorAsync(int seq, short type, List<CFilterRangeBearing> m_vInclFilter, List<CFilterRangeBearing> m_vExclFilter)
         {
             throw new NotImplementedException();
+        }
+
+        public async Task<int> DBSaveFolderAsync(string name, int? parentId = null)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                throw new ArgumentException("Folder name required", nameof(name));
+
+            await using var conn = new NpgsqlConnection(_connectionString);
+            await conn.OpenAsync();
+
+            if (parentId.HasValue)
+            {
+                const string parentExistsSql = @"SELECT EXISTS (SELECT 1 FROM ""Folder"" WHERE ""ID"" = @ID);";
+                bool exists = await conn.ExecuteScalarAsync<bool>(parentExistsSql, new { ID = parentId.Value });
+                if (!exists)
+                    throw new InvalidOperationException($"Parent folder {parentId.Value} does not exist.");
+            }
+
+            const string insertSql = @"
+                INSERT INTO ""Folder"" (""ParentID"", ""Name"")
+                VALUES (@ParentID, @Name)
+                RETURNING ""ID"";";
+
+            return await conn.ExecuteScalarAsync<int>(insertSql, new
+            {
+                ParentID = parentId,
+                Name = name
+            });
         }
 
         public Task<bool> DBSaveGeodesyAsync(ProjectionInfoType m_projsetup, long nBlockId = -1)
@@ -131,9 +188,39 @@ namespace PostgresDataLoggerService.Data
             throw new NotImplementedException();
         }
 
-        public Task<bool> DBSaveRollAsync(long time, float roll, long nBlockId = -1, short seq = 0)
+        public async Task<bool> DBSaveRollAsync(long time, float roll, long nBlockId = -1, short seq = 0)
         {
-            throw new NotImplementedException();
+           try
+           {
+                await using var connection = new NpgsqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                const string sql = @"
+                    INSERT INTO ""Roll"" (""BlockID"", ""seq"", ""Time"", ""Roll"")
+                    VALUES (@BlockID, @Seq, @Time, @Roll)
+                    ON CONFLICT DO NOTHING;";
+
+                var parameters = new
+                {
+                    BlockID = nBlockId,
+                    Seq = seq,
+                    Time = (int)time,
+                    Roll = roll
+                };
+
+                int rows = await connection.ExecuteAsync(sql, parameters);
+                return rows > 0;
+            }
+            catch (PostgresException pgx)
+            {
+                // Example: foreign key violation if BlockID not present
+                // You might log pgx.SqlState / pgx.MessageText here.
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public Task<bool> DBSaveScanAsync(EScanRecord scanData, long time, long nHeadIdx, double soundVelocity, long nDuration = -1, long nPingNumber = -1, long nBlockId = -1, long nDetectionIdx = 0, short nType = 16, int freq = 0, short nNumberOfBeams = 0, byte[]? cBeams = null)
@@ -211,9 +298,38 @@ namespace PostgresDataLoggerService.Data
             throw new NotImplementedException();
         }
 
-        public Task<RollDataModel> GetRollAsync(long nBlockId)
+        public async Task<RollDataModel> GetFirstRollAsync(long nBlockId)
         {
-            throw new NotImplementedException();
+            if (nBlockId < 0)
+                throw new ArgumentException("BlockID must be >= 0.", nameof(nBlockId));
+
+            await using var connection = new NpgsqlConnection(_connectionString);
+            await connection.OpenAsync();
+
+            const string sql = @"
+                SELECT ""Time"", ""Roll"", ""seq""
+                FROM ""Roll""
+                WHERE ""BlockID"" = @BlockID
+                ORDER BY ""Time"" DESC
+                LIMIT 1;";
+
+            var row = await connection.QueryFirstOrDefaultAsync<(int Time, float Roll, short Seq)>(sql, new { BlockID = nBlockId });
+
+            if (row == default)
+                return default; // no data for this block
+
+            // TimeEditDataModel is not shown in the provided context; leaving it default.
+            return new RollDataModel
+            {
+                Roll = row.Roll,
+                TimeEditData = new TimeEditDataModel()
+                {
+                    BlockID = nBlockId,
+                    Time = row.Time,
+                    Seq = row.Seq,
+                    Status = 0
+                }                
+            };
         }
 
         public Task InitBulkObjectsAsync()
