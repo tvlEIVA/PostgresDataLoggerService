@@ -1,4 +1,42 @@
 # PostgresDataLoggerService
+# 🐳 Install Docker Desktop on Windows
+
+## 1️⃣ Check System Requirements
+
+Before installing, make sure your system meets the requirements:
+
+- **Windows 10 64-bit** (Pro, Enterprise, or Education) or **Windows 11**
+- **Hardware virtualization** enabled in BIOS
+- **WSL 2 (Windows Subsystem for Linux)** feature enabled  
+  *(Docker Desktop uses WSL 2 as its backend on Windows)*
+
+---
+
+## 2️⃣ Download Docker Desktop
+
+1. Go to the official Docker website:  
+   [https://www.docker.com/products/docker-desktop/](https://www.docker.com/products/docker-desktop/)
+2. Click **“Download for Windows”**.
+3. Save the installer file (e.g., `Docker Desktop Installer.exe`).
+
+---
+
+## 3️⃣ Install Docker Desktop
+
+1. Run the downloaded installer.  
+2. In the setup wizard:
+   - Ensure **“Use WSL 2 instead of Hyper-V”** is checked (recommended).  
+   - Click **OK** and continue the installation.  
+3. When installation finishes, restart your computer if prompted.
+
+---
+
+## 4️⃣ First Launch
+
+1. After reboot, launch **Docker Desktop** from the Start Menu.  
+2. Accept the service agreement if asked.  
+3. Wait for Docker to start — you’ll see a **whale icon 🐳** in the system tray once it’s running.
+
 # PostgreSQL + pgAdmin Setup on Windows
 
 ## 1️⃣ Download
