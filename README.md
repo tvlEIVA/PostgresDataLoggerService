@@ -1,4 +1,38 @@
 # PostgresDataLoggerService
+Lightweight ASP.NET Core (.NET 8, C# 12) Web API for logging and retrieving survey / navigation related time‑series data in PostgreSQL. Uses Dapper for data access and a hand-crafted schema (see `init/NE_schema_postgres.sql`). Currently only a minimal subset of writer/reader operations is implemented (Folders, minimal Block creation, Roll insert & latest Roll query) with many extension points stubbed.
+
+## Features (current)
+- Create folder hierarchy (`/Interpreter/folder`)
+- Create minimal survey blocks (`/Interpreter/block-min`)
+- Insert roll samples (`/Interpreter/roll` POST)
+- Retrieve most recent roll sample for a block (`/Interpreter/roll` GET)
+- Dockerized Postgres + API (via `docker-compose.yml`)
+- Swagger UI in Development environment
+
+## Tech Stack
+- ASP.NET Core 8 Web API
+- Dapper + Npgsql
+- PostgreSQL 15 (initialized from `init/NE_schema_postgres.sql`)
+- Dependency Injection (interfaces: `IDataWriter`, `IDataReader`)
+- Docker / Docker Compose
+
+## Project Structure (key parts)
+- PostgresDataLoggerService/
+  - Program.cs (service registration + pipeline)
+  - Controllers/InterpreterController.cs (current API endpoints)
+  - Data/
+    - Interfaces/ (abstractions)
+    - PostgresDataAccess.cs (implementation; many methods NotImplemented)
+  - appsettings.json (base connection string; overridden in containers)
+- init/NE_schema_postgres.sql (full schema bootstrap)
+- docker-compose.yml (API + DB)
+
+## Database
+On first `docker-compose up`, Postgres runs the schema script mounted at `/docker-entrypoint-initdb.d`.  
+Connection string override (compose):  
+`ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=mydb;Username=postgres;Password=postgres`
+
+
 # 🐳 Install Docker Desktop on Windows
 
 ## 1️⃣ Check System Requirements
